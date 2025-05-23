@@ -1,0 +1,9 @@
+server:
+  address: "127.0.0.1:3000"
+  url_path:
+    content: "/check/content"
+    url: "/check/url"
+    reload: "/manage/reload"
+
+yara:
+  rule_dir: "./rules"
