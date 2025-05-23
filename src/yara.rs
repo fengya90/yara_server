@@ -1,3 +1,5 @@
+use crate::compress::extract_first_file_as_bytes;
+use crate::http::download_url_to_bytes;
 use crate::dto::{MatchedRules, YaraResult};
 use std::fs;
 use std::io;
@@ -78,5 +80,39 @@ pub fn match_yara_rules(bytes: &[u8]) -> YaraResult {
     YaraResult {
         matched_rule_count: matched_info.len(),
         matched_rules: matched_info,
+        error: None,
     }
+}
+
+pub  fn match_yara_rules_with_unzip(bytes: &[u8], need_to_unzip: bool) -> YaraResult {
+    if need_to_unzip {
+        match extract_first_file_as_bytes(bytes) {
+            Ok(content) =>  {
+                    return match_yara_rules(&content);
+            },
+            Err(e) => {
+                return YaraResult {
+                    matched_rule_count: 0,
+                    matched_rules: vec![],
+                    error: Some(format!("Failed to unzip file: {}", e)),
+                };
+            }
+        }
+    } else {
+        return match_yara_rules(bytes);
+    }
+}
+
+pub async   fn match_yara_rules_with_unzip_and_url(url: &String, need_to_unzip: bool) -> YaraResult {
+    let download_bytes = match download_url_to_bytes(url).await {
+        Ok(b) => b,
+        Err(e) => {
+          return YaraResult {
+                    matched_rule_count: 0,
+                    matched_rules: vec![],
+                    error: Some(format!("dowload file failed: {}", e)),
+                };
+        }
+    };
+    return match_yara_rules_with_unzip(&download_bytes,need_to_unzip);
 }

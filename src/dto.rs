@@ -4,6 +4,7 @@ use serde_json::Value;
 
 #[derive(Deserialize)]
 pub struct UrlDto {
+    pub need_to_unzip: bool,
     pub url: String,
 }
 
@@ -18,4 +19,5 @@ pub struct MatchedRules {
 pub struct YaraResult {
     pub matched_rule_count: usize,
     pub matched_rules: Vec<MatchedRules>,
+    pub error: Option<String>,
 }

@@ -34,16 +34,17 @@ run the command:
 ### Check the url
 ```
 curl  -X POST -H "Content-Type: application/json" -d '{
-    "url": "http://127.0.0.1:8000/test.zip"
-}' http://127.0.0.1:3000/check/url
+    "url": "http://127.0.0.1:8000/test.zip",
+    "need_to_unzip":true
+}' 'http://127.0.0.1:3000/check/url'
 ```
 
 ### Check the file
 ```
-curl -X POST http://127.0.0.1:3000 --data-binary @your_file
+curl -X POST 'http://127.0.0.1:3000/check/content?need_to_unzip=true'  --data-binary @test.zip
 ```
 
 ### Reload yara rules
 ```
-curl  -X POST  http://127.0.0.1:3000/manage/reload
+curl  -X POST  'http://127.0.0.1:3000/manage/reload'
 ```

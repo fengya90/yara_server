@@ -6,7 +6,6 @@ use std::path::Path;
 pub struct Settings {
     pub server: ServerConfig,
     pub yara: YaraConfig,
-    // pub elasticsearch: ElasticsearchConfig,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,14 +25,6 @@ pub struct UrlPath {
 pub struct YaraConfig {
     pub rule_dir: String,
 }
-
-// #[derive(Debug, Deserialize)]
-// pub struct ElasticsearchConfig {
-//     pub address: String,
-//     pub username: String,
-//     pub password: String,
-//     pub index_prefix: String,
-// }
 
 impl Settings {
     pub fn from_yaml(path: &str) -> Result<Self, config::ConfigError> {

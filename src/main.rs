@@ -1,17 +1,17 @@
 mod config;
 use crate::config::Settings;
 mod http;
-use http::download_url_to_bytes;
 mod compress;
-use compress::extract_first_file_as_bytes;
-mod yara;
 mod dto;
+mod yara;
+use axum::extract::Query;
 use dto::UrlDto;
+use std::collections::HashMap;
 use tracing::info;
 
+use tracing_appender::rolling;
 use tracing_subscriber;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
-use tracing_appender::rolling;
 
 use axum::{
     Json, Router,
@@ -27,7 +27,9 @@ use serde_json::json;
 async fn main() {
     let file_appender = rolling::daily("logs", "app.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    tracing_subscriber::fmt().with_writer(non_blocking.with_max_level(tracing::Level::INFO)).init();
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking.with_max_level(tracing::Level::INFO))
+        .init();
     info!("starting...");
     let settings: Settings = Settings::from_yaml("config/config.yaml").unwrap();
     info!("Listening on: {}", settings.server.address);
@@ -48,7 +50,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn check_content(body: Body) -> impl IntoResponse {
+async fn check_content(
+    Query(params): Query<HashMap<String, String>>,
+    body: Body,
+) -> impl IntoResponse {
     let bytes = match to_bytes(body, usize::MAX).await {
         Ok(b) => b,
         Err(_) => {
@@ -59,12 +64,14 @@ async fn check_content(body: Body) -> impl IntoResponse {
                 .into_response();
         }
     };
-
-    Json(yara::match_yara_rules(&bytes)).into_response()
+    let need_to_unzip = params
+        .get("need_to_unzip")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    Json( yara::match_yara_rules_with_unzip(&bytes, need_to_unzip)).into_response()
 }
 
 async fn check_url(body: Body) -> impl IntoResponse {
-    // 尝试读取整个 body
     let bytes = match to_bytes(body, usize::MAX).await {
         Ok(b) => b,
         Err(_) => {
@@ -76,7 +83,6 @@ async fn check_url(body: Body) -> impl IntoResponse {
         }
     };
 
-    // 尝试将 body 解析为 JSON，提取 URL
     let req: UrlDto = match serde_json::from_slice(&bytes) {
         Ok(r) => r,
         Err(_) => {
@@ -87,29 +93,8 @@ async fn check_url(body: Body) -> impl IntoResponse {
                 .into_response();
         }
     };
-    let zip_bytes = match download_url_to_bytes(&req.url).await {
-        Ok(b) => b,
-        Err(_) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": "Failed to download file" })),
-            )
-                .into_response();
-        }
-    };
-
-    let content = match extract_first_file_as_bytes(&zip_bytes).await {
-        Ok(b) => b,
-        Err(_) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                Json(json!({ "error": "Failed to unzip file" })),
-            )
-                .into_response();
-        }
-    };
-
-    Json(yara::match_yara_rules(&content)).into_response()
+    let yara_result = yara::match_yara_rules_with_unzip_and_url(&req.url, req.need_to_unzip).await;
+    Json(yara_result).into_response()    
 }
 
 async fn reload() -> impl IntoResponse {
